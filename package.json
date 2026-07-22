@@ -1,6 +1,6 @@
 {
   "name": "db-backup-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "MySQL-in-Docker backup CLI: dumps via `docker exec mysqldump`, uploads to any S3-compatible store (R2, Backblaze B2, AWS S3, ...), notifies by email + Telegram. Used across multiple internal projects — not published publicly.",
   "type": "module",

@@ -26,20 +26,24 @@ async function listAll(client, bucket, prefix) {
 }
 
 export async function runSummary5min(env) {
-  requireEnv(env, ["S3_5MIN_ENDPOINT", "S3_5MIN_REGION", "S3_5MIN_KEY_ID", "S3_5MIN_SECRET_KEY", "S3_5MIN_BUCKET"]);
-
-  const prefix = env.S3_5MIN_PREFIX || "5min-backups/";
-  const intervalMinutes = Number(env.BACKUP_INTERVAL_MINUTES || 5);
+  // Computed up front (never throws) so the catch block below can always
+  // alert — a config error (missing env var) is exactly the kind of failure
+  // that must not fail silently.
   const notifyConfig = readNotifyConfig(env);
 
-  const client = new S3Client({
-    endpoint: `https://${env.S3_5MIN_ENDPOINT}`,
-    region: env.S3_5MIN_REGION,
-    credentials: { accessKeyId: env.S3_5MIN_KEY_ID, secretAccessKey: env.S3_5MIN_SECRET_KEY },
-    forcePathStyle: true,
-  });
-
   try {
+    requireEnv(env, ["S3_5MIN_ENDPOINT", "S3_5MIN_REGION", "S3_5MIN_KEY_ID", "S3_5MIN_SECRET_KEY", "S3_5MIN_BUCKET"]);
+
+    const prefix = env.S3_5MIN_PREFIX || "5min-backups/";
+    const intervalMinutes = Number(env.BACKUP_INTERVAL_MINUTES || 5);
+
+    const client = new S3Client({
+      endpoint: `https://${env.S3_5MIN_ENDPOINT}`,
+      region: env.S3_5MIN_REGION,
+      credentials: { accessKeyId: env.S3_5MIN_KEY_ID, secretAccessKey: env.S3_5MIN_SECRET_KEY },
+      forcePathStyle: true,
+    });
+
     // Runs right after midnight, so "yesterday" is the day whose backups need summarizing/purging.
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const dateStr = localDateString(yesterday);

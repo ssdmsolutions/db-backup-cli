@@ -10,7 +10,10 @@ const command = args[0];
 
 const envFileIdx = args.indexOf("--env-file");
 const envFile = envFileIdx !== -1 ? args[envFileIdx + 1] : path.join(process.cwd(), ".env");
-dotenv.config({ path: envFile });
+const dotenvResult = dotenv.config({ path: envFile });
+if (dotenvResult.error) {
+  console.warn(`Warning: could not load env file at ${envFile} (${dotenvResult.error.message}). Falling back to process.env only.`);
+}
 
 const commands = {
   dump: runDump,
@@ -37,4 +40,7 @@ if (!command || !commands[command]) {
 
 commands[command](process.env)
   .then(() => process.exit(0))
-  .catch(() => process.exit(1));
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

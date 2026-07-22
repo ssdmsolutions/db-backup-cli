@@ -18,24 +18,29 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { dumpDatabase, verifyGzipIntegrity, requireEnv, readDbConfig, readNotifyConfig, sendTelegram, localDateString } from "../lib.mjs";
 
 export async function runDump5min(env) {
-  requireEnv(env, ["DB_CONTAINER", "DB_NAME", "S3_5MIN_ENDPOINT", "S3_5MIN_REGION", "S3_5MIN_KEY_ID", "S3_5MIN_SECRET_KEY", "S3_5MIN_BUCKET"]);
-
-  const db = readDbConfig(env);
-  if (!db.dbPassword) {
-    throw new Error("DB_PASSWORD (or MYSQL_ROOT_PASSWORD) is not set");
-  }
-
-  const prefix = env.S3_5MIN_PREFIX || "5min-backups/";
+  // Computed up front (never throw) so the catch block below can always
+  // alert — a config error (missing env var, bad password) is exactly the
+  // kind of failure that must not fail silently.
   const notifyConfig = readNotifyConfig(env);
-
   const startedAt = new Date();
-  const timestamp = startedAt.toISOString().replace(/[:.]/g, "-");
-  const fileName = `${db.dbName}-${timestamp}.sql.gz`;
-  const tmpDir = path.join(os.tmpdir(), "db-backups-5min");
-  await mkdir(tmpDir, { recursive: true });
-  const localPath = path.join(tmpDir, fileName);
+  let db;
+  let localPath;
 
   try {
+    requireEnv(env, ["DB_CONTAINER", "DB_NAME", "S3_5MIN_ENDPOINT", "S3_5MIN_REGION", "S3_5MIN_KEY_ID", "S3_5MIN_SECRET_KEY", "S3_5MIN_BUCKET"]);
+
+    db = readDbConfig(env);
+    if (!db.dbPassword) {
+      throw new Error("DB_PASSWORD (or MYSQL_ROOT_PASSWORD) is not set");
+    }
+
+    const prefix = env.S3_5MIN_PREFIX || "5min-backups/";
+    const timestamp = startedAt.toISOString().replace(/[:.]/g, "-");
+    const fileName = `${db.dbName}-${timestamp}.sql.gz`;
+    const tmpDir = path.join(os.tmpdir(), "db-backups-5min");
+    await mkdir(tmpDir, { recursive: true });
+    localPath = path.join(tmpDir, fileName);
+
     await dumpDatabase({ ...db, localPath });
 
     const { size } = await stat(localPath);
@@ -63,12 +68,14 @@ export async function runDump5min(env) {
       chatId: notifyConfig.telegramChatId,
       text: [
         `⚠️ [${notifyConfig.appLabel}] 5-min database backup FAILED`,
-        `Database: ${db.dbName}`,
+        db?.dbName ? `Database: ${db.dbName}` : null,
         `Time: ${startedAt.toISOString()}`,
         `Error: ${err.message}`,
-      ].join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
     });
-    await rm(localPath, { force: true }).catch(() => {});
+    if (localPath) await rm(localPath, { force: true }).catch(() => {});
     throw err;
   }
 }
