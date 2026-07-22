@@ -7,7 +7,7 @@ and notifies by email + Telegram. Private, internal tool — not published to np
 ## Install (in a consuming project)
 
 ```bash
-npm install git+https://github.com/<your-org>/db-backup-cli.git --save-dev
+npm install git+https://github.com/ssdmsolutions/db-backup-cli.git --save-dev
 # or, without a remote yet, a local path during development:
 npm install /path/to/db-backup-cli --save-dev
 ```
