@@ -20,10 +20,13 @@ This exposes a `db-backup` binary via `npx db-backup <command>`.
 |---|---|
 | `db-backup dump` | Full backup: dump → verify → upload → prune old backups → email + Telegram notification (success or failure) |
 | `db-backup 5min` | Frequent rolling backup, meant for a `*/N * * * *` cron. Silent on success; alerts Telegram immediately on failure |
-| `db-backup 5min-summary` | Run once daily, shortly after midnight. Reports yesterday's rolling-backup count/size to Telegram, then deletes them |
+| `db-backup 5min-summary` | Run once daily, shortly after midnight. Reports yesterday's rolling-backup count/size to Telegram, and permanently deletes all rolling backups from before today (catches up missed days) |
 
 All commands read config from `process.env`, loaded via `.env` in the current working directory by default.
 Point elsewhere with `--env-file <path>`.
+
+`db-backup 5min-summary --dry-run` lists what would be purged, per day, without deleting anything
+or sending Telegram.
 
 ## Env vars
 
@@ -92,3 +95,7 @@ safe to deploy before wiring up every channel.
   exit alone races with gzip's final flush and can silently upload a truncated file.
 - Every dump is decompressed end-to-end (`verifyGzipIntegrity`) before upload, so a corrupt
   dump is reported as a failed backup rather than uploaded as if it succeeded.
+- `5min-summary` deletes rolling backups by **version**, not just by key. On versioned stores
+  (Backblaze B2 always; AWS S3 with versioning on) a plain delete only hides the file and it stays
+  stored and billed. On stores without versioning (Cloudflare R2) it falls back to plain deletes,
+  which are already permanent there. The B2 application key needs the `deleteFiles` capability.

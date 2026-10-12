@@ -15,6 +15,8 @@ if (dotenvResult.error) {
   console.warn(`Warning: could not load env file at ${envFile} (${dotenvResult.error.message}). Falling back to process.env only.`);
 }
 
+const dryRun = args.includes("--dry-run");
+
 const commands = {
   dump: runDump,
   "5min": runDump5min,
@@ -22,12 +24,13 @@ const commands = {
 };
 
 function printUsage() {
-  console.log(`Usage: db-backup <command> [--env-file <path>]
+  console.log(`Usage: db-backup <command> [--env-file <path>] [--dry-run]
 
 Commands:
   dump           Full backup: dump -> upload -> prune -> notify (email + Telegram)
   5min           Frequent rolling backup: dump -> upload; silent on success, alerts on failure
   5min-summary   Daily summary + purge of the rolling backups (run once, shortly after midnight)
+                 --dry-run: show what would be purged; delete nothing, send no Telegram
 
 Config is read from process.env, loaded from --env-file (default: ./.env in the current directory).
 See README.md for the full list of env vars.`);
@@ -38,7 +41,14 @@ if (!command || !commands[command]) {
   process.exit(command ? 1 : 0);
 }
 
-commands[command](process.env)
+// Refuse rather than ignore: `dump --dry-run` silently doing a real backup
+// would be a nasty surprise.
+if (dryRun && command !== "5min-summary") {
+  console.error(`--dry-run is only supported by 5min-summary, not ${command}.`);
+  process.exit(1);
+}
+
+commands[command](process.env, { dryRun })
   .then(() => process.exit(0))
   .catch((err) => {
     console.error(err);
